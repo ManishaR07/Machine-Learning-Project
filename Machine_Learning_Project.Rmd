@@ -1,0 +1,137 @@
+---
+title: "Machine_Learning_Project"
+author: "Manisha Rana"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setoptions,echo=TRUE}
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+# Executive summary
+### The goal of the project is to analyze exercise activities of the people available from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and to predict the manner in which they did the exercise. The target variable is "Classe" variable in the dataset. We have two datasets Train and Test. We build our model on train data. First we do some exploratory analysis and see if some cleaning and transformations are required. The train data has been standardized. We convert the "Classe" variable into a factor variable. Further we split the train data into train(60%) and test(40%) to validate the model that we build on the 60% of the trained data which can be tested with 40% of the test data in train dataset. We first use ML algo Decision Tree as we have a classification problem at hand. We find out that out of sample accuracy for DT was 88.5%. Then we use Random Forest Ml algo to further the accuracy of the algorithm and we find that the out of sample accuracy of the model is 99.5%.
+
+### Loading the libraries
+```{r}
+library(caret)
+library(randomForest)
+library(rpart)
+library(e1071)
+library(rattle)
+```
+
+### Downloading the Train and test data
+```{r}
+link_train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+link_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(link_train,destfile = "C:/Users/drpra/Desktop/Home Stuff/Coursera_Data_Science/Machine-Learning-Project/train.csv", method = "curl")
+download.file(link_test,destfile =  "C:/Users/drpra/Desktop/Home Stuff/Coursera_Data_Science/Machine-Learning-Project/test.csv", method = "curl")
+
+train_df <- read.csv("train.csv")
+test_df <- read.csv("test.csv")
+```
+
+### Checking for missing data
+```{r}
+colSums(is.na(train_df))
+
+train_df[train_df == ""] <- NA
+test_df[test_df == ""] <- NA
+```
+
+### Removing columns which have more than 50% of missing data
+```{r}
+work_traindf <- train_df
+for(i in 1:length(train_df)){
+  if((sum(is.na(train_df[,i])))/nrow(train_df) >= .5){
+    for(j in 1:length(train_df)){
+      if(length( grep(names(train_df)[i], names(work_traindf)[j])) == 1)
+        work_traindf[,j] <- NULL
+    }
+    
+  }
+}
+
+train_df <- work_traindf
+
+work_testdf <-test_df
+
+for(i in 1:length(test_df)){
+  if((sum(is.na(test_df[,i])))/nrow(test_df) >= .5){
+    for(j in 1:length(test_df)){
+      if(length( grep(names(test_df)[i], names(work_testdf)[j])) == 1)
+        work_testdf[,j] <- NULL
+    }
+    
+  }
+}
+
+test_df <- work_testdf
+
+```
+
+### Preprocessing the data
+```{r}
+preprocess_traindf <- preProcess(train_df,method= c("center","scale"))
+predData <- predict(preprocess_traindf,newdata =train_df)
+```
+
+### Partitoning the Train dataset into Train and Test for further validation
+```{r}
+inTrain <- createDataPartition(y=train_df$classe, p=0.6, list=FALSE)
+Train_traindf <- train_df[inTrain, ]; Test_traindf <- train_df[-inTrain, ]
+dim(Train_traindf); dim(Test_traindf)
+```
+
+### Converting Classe variable into factors and removing the ID column
+```{r}
+Train_traindf <- Train_traindf[c(-1)]
+Test_traindf <- Test_traindf[c(-1)]
+
+Train_traindf$classe <- as.factor(Train_traindf$classe)
+Test_traindf$classe <- as.factor(Test_traindf$classe)
+```
+
+### Using ML algorithm - Decision Trees
+```{r}
+model1 <- rpart(classe~.,data=Train_traindf,method="class")
+fancyRpartPlot(model1)
+```
+
+### Predicting with Decision Tree on the Test data (subset of Train data)
+```{r}
+predData1 <- predict(model1,Test_traindf,type="class")
+```
+
+### checking for accuracy - out of sample accuracy
+```{r}
+confusionMatrix(predData1,Test_traindf$classe)
+```
+
+### Using ML algorithm - Random Forest
+```{r}
+model2<- randomForest(classe~.,data=Train_traindf)
+```
+
+### Predicting with Random forest on the Test Data (subset of Train data)
+```{r}
+predData2 <- predict(model2,Test_traindf,type="class")
+```
+
+### Checking for accuracy through confusion matrix
+```{r}
+confusionMatrix(predData2,Test_traindf$classe)
+```
+
+### Cleaning the final test data as we did with train data
+```{r}
+test_df <- test_df[c(-1)]
+```
+
+### Using model 2 from Random forest to predict on final test data of 20 participants
+```{r}
+predDataFinal <- predict(model2,test_df,type="class")
+predDataFinal
+```
